@@ -25,3 +25,4 @@ flutter:
         pluginClass: ThaiCardReaderPlugin
       ios:
         pluginClass: ThaiCardReaderPlugin
+        podspecPath: "../thai_card_reader.podspec"
