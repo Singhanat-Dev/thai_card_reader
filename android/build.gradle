@@ -1,0 +1,62 @@
+group 'com.example.thai_card_reader'
+version '1.0-SNAPSHOT'
+
+buildscript {
+    ext.kotlin_version = '2.2.20'
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.3.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+// Capture plugin's projectDir before allprojects scope (project = :thai_card_reader here)
+def pluginDir = project.projectDir
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        // Local Maven repo for rdnalib.aar — added to ALL projects so :app can resolve it too
+        // AGP 7+ does not allow direct local .aar in library modules — must use Maven
+        maven {
+            url "${pluginDir}/libs"
+        }
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.example.thai_card_reader'
+    }
+    compileSdk 35
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        minSdkVersion 21
+    }
+}
+
+dependencies {
+    implementation 'rd.nalib:rdnalib:1.0'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+}
