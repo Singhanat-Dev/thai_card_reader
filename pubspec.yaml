@@ -2,7 +2,7 @@ name: thai_card_reader
 description: "A Flutter plugin for reading Thai national ID cards via USB/BT/BLE smart card readers using the R&D NID library."
 repository: https://github.com/Singhanat-Dev/thai_card_reader
 
-version: 1.0.0
+version: 1.0.1
 
 environment:
   sdk: ^3.11.3
@@ -25,3 +25,4 @@ flutter:
         pluginClass: ThaiCardReaderPlugin
       ios:
         pluginClass: ThaiCardReaderPlugin
+        podspecPath: "../thai_card_reader.podspec"

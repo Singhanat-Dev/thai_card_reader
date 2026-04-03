@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' show log;
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -19,13 +20,11 @@ class ThaiCardReader {
 
   // ── Channels ──
   static const _methodChannel = MethodChannel('NiosLib/Api');
-  static const _messageChannel =
-      BasicMessageChannel<String>('NiosLib/message', StringCodec());
+  static const _messageChannel = BasicMessageChannel<String>('NiosLib/message', StringCodec());
   static const _eventChannel = EventChannel('NiosLib/usb_events');
 
   // ── Card events stream (from BasicMessageChannel) ──
-  final _cardEventsController =
-      StreamController<Map<String, dynamic>>.broadcast();
+  final _cardEventsController = StreamController<Map<String, dynamic>>.broadcast();
 
   void _initMessageChannel() {
     _messageChannel.setMessageHandler((String? message) async {
@@ -42,9 +41,11 @@ class ThaiCardReader {
   /// Each event is a Map with keys: 'ResCode', 'ResValue', optionally 'ResText', 'ResPhoto', 'ResPhotoSize'.
   Stream<Map<String, dynamic>> get cardEvents => _cardEventsController.stream;
 
-  /// Stream of USB hardware events (from EventChannel).
+  /// Stream of USB hardware events (from EventChannel, Android only).
   /// Events: device_attached, device_detached, permission_granted, permission_denied, readers_found, reader_not_found.
+  /// Returns an empty stream on iOS (BLE mode has no USB events).
   Stream<Map<String, dynamic>> get usbEvents {
+    if (Platform.isIOS) return const Stream.empty();
     return _eventChannel.receiveBroadcastStream().map((dynamic event) {
       if (event is Map) {
         return Map<String, dynamic>.from(event);
@@ -76,8 +77,7 @@ class ThaiCardReader {
       final updateResult = await invoke('updateLicenseFileNi');
       if (isSuccess(updateResult)) {
         // Retry open after update
-        final retryResult =
-            await invoke('openNiOSLibNi', {'path': licensePath});
+        final retryResult = await invoke('openNiOSLibNi', {'path': licensePath});
         if (isSuccess(retryResult)) return null;
         return retryResult?['ResValue']?.toString() ?? 'Failed to open library after license update';
       }
@@ -95,10 +95,18 @@ class ThaiCardReader {
 
   /// Scan for readers and return raw JSON response.
   /// On Android: calls getReaderListNi (shows popup).
-  /// On iOS: calls scanReaderListBleNi.
-  Future<Map<String, dynamic>?> scanReaders() async {
-    final method = Platform.isAndroid ? 'getReaderListNi' : 'scanReaderListBleNi';
-    return invoke(method);
+  /// On iOS: calls scanReaderListBleNi with [bleTimeout] seconds (default 10).
+  /// ResCode from native = number of readers found (>0 = success).
+  /// Normalized to ResCode:0 so callers can use [isSuccess] uniformly.
+  Future<Map<String, dynamic>?> scanReaders({int bleTimeout = 10}) async {
+    final result = await (Platform.isAndroid
+        ? invoke('getReaderListNi')
+        : invoke('scanReaderListBleNi', {'timeout': bleTimeout}));
+    if (result == null) return null;
+    final code = result['ResCode'];
+    final n = code is int ? code : int.tryParse(code.toString()) ?? -1;
+    if (n > 0) return {...result, 'ResCode': 0};
+    return result;
   }
 
   /// Select a reader by name. Returns null on success, error string on failure.
@@ -138,12 +146,9 @@ class ThaiCardReader {
   /// Get list of connected USB smart card readers.
   Future<List<Map<String, dynamic>>> getConnectedReaders() async {
     try {
-      final result =
-          await _methodChannel.invokeMethod<List<dynamic>>('getConnectedReaders');
+      final result = await _methodChannel.invokeMethod<List<dynamic>>('getConnectedReaders');
       if (result == null) return [];
-      return result
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList();
+      return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } on PlatformException {
       return [];
     }
@@ -159,12 +164,13 @@ class ThaiCardReader {
   Future<Map<String, dynamic>?> getLicenseInfo() => invoke('getLicenseInfoNi');
 
   /// Low-level: invoke any method channel call.
-  Future<Map<String, dynamic>?> invoke(
-      String method, [Map<String, dynamic>? args]) async {
+  Future<Map<String, dynamic>?> invoke(String method, [Map<String, dynamic>? args]) async {
     try {
       final res = await _methodChannel.invokeMethod<String>(method, args);
       if (res == null) return null;
-      return jsonDecode(res) as Map<String, dynamic>;
+      final json = jsonDecode(res) as Map<String, dynamic>;
+      log('$method: → $json', name: 'ThaiCardReader');
+      return json;
     } on PlatformException {
       return null;
     }

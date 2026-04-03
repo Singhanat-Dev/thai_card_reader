@@ -3,10 +3,7 @@
 #include "CCIDLib/include/ft301u.h"
 #import "NIOSLib/include/NiOS.h"
 
-@interface NidLib :  NSObject {
-
-
-}
+@interface NidLib :  NSObject {}
 
 -(NiOS *) getNiOS;
 -(void)bindMessageChannel: (FlutterBasicMessageChannel*) msg;

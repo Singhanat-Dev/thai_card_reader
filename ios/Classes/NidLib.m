@@ -115,9 +115,10 @@ SInt32 activeReaderTypeNi = -1;
     }
 
     
-    [mMessageChannel sendMessage:msg];
-    
- 
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [mMessageChannel sendMessage:msg];
+    });
+
     return ;
     
 }
